@@ -3,7 +3,7 @@
 const express = require("express");
 const ejs = require("ejs");
 const _ = require("lodash");
-let posts = [];
+const mongoose = require("mongoose");
 
 const homeStartingContent =
   "Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.";
@@ -19,10 +19,32 @@ app.set("view engine", "ejs");
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
+mongoose.connect("mongodb://localhost:27017/blogDB", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+const postSchema = {
+  title: {
+    required: true,
+    type: String,
+  },
+  body: {
+    required: true,
+    type: String,
+  },
+};
+
+const Post = mongoose.model("Post", postSchema);
+
 app.get("/", function (req, res) {
-  res.render("home", {
-    homeStartingContent: homeStartingContent,
-    posts: posts,
+  Post.find((err, posts) => {
+    if (!err) {
+      res.render("home", {
+        homeStartingContent: homeStartingContent,
+        posts: posts,
+      });
+    }
   });
 });
 
@@ -48,28 +70,41 @@ app.get("/compose", function (req, res) {
 //   if (post) res.render("post", { post: post });
 // });
 
-app.get("/posts/:postName", function (req, res) {
-  const requestedTitle = _.lowerCase(req.params.postName);
+// app.get("/posts/:postName", function (req, res) {
+//   const requestedTitle = _.lowerCase(req.params.postName);
 
-  posts.forEach(function (post) {
-    const storedTitle = _.lowerCase(post.postTitle);
+//   posts.forEach(function (post) {
+//     const storedTitle = _.lowerCase(post.postTitle);
 
-    if (storedTitle === requestedTitle) {
+//     if (storedTitle === requestedTitle) {
+//       res.render("post", {
+//         postTitle: post.postTitle,
+//         postBody: post.postBody,
+//       });
+//     }
+//   });
+// });
+
+app.get("/posts/:postId", function (req, res) {
+  const { postId } = req.params;
+
+  Post.findOne({ _id: postId }, (err, post) => {
+    if (!err) {
       res.render("post", {
-        postTitle: post.postTitle,
-        postBody: post.postBody,
+        postTitle: post.title,
+        postBody: post.body,
       });
     }
   });
 });
 
-app.post("/compose", function (req, res) {
-  const post = {
-    postTitle: req.body.postTitle,
-    slug: _.kebabCase(req.body.postTitle),
-    postBody: req.body.postBody,
-  };
-  posts.push(post);
+app.post("/compose", async function (req, res) {
+  const post = new Post({
+    title: req.body.postTitle,
+    body: req.body.postBody,
+  });
+
+  await post.save();
 
   res.redirect("/");
 });
